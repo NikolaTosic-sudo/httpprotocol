@@ -103,7 +103,5 @@ func (cr *chunkReader) Read(p []byte) (n int, err error) {
 	n = copy(p, cr.data[cr.pos:endIndex])
 	cr.pos += n
 
-	fmt.Println(n)
-
 	return n, nil
 }
