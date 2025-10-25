@@ -169,7 +169,6 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 		return n, nil
 
 	case StateBody:
-		fmt.Println("udje li odje uopste")
 		value, found := r.Headers.Get("content-length")
 		if !found {
 			r.state = StateDone
