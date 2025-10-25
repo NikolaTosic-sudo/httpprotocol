@@ -14,6 +14,11 @@ func NewHeaders() Headers {
 	return map[string]string{}
 }
 
+func (h Headers) Get(key string) (string, bool) {
+	value, found := h[strings.ToLower(key)]
+	return value, found
+}
+
 func isAllowedRune(r rune) bool {
 	switch {
 	case r >= 'a' && r <= 'z':
