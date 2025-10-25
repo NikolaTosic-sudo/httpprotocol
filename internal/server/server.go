@@ -8,19 +8,13 @@ import (
 	"io"
 	"log"
 	"net"
-)
-
-type serverState string
-
-const (
-	ServerClosed  serverState = "closed"
-	ServerRunning serverState = "running"
+	"sync/atomic"
 )
 
 type Server struct {
-	state    serverState
 	listener net.Listener
 	handler  Handler
+	closed   atomic.Bool
 }
 
 type HandlerError struct {
@@ -32,7 +26,6 @@ type Handler func(w io.Writer, req *request.Request) *HandlerError
 
 func newServer(l net.Listener, handler Handler) *Server {
 	return &Server{
-		state:    ServerRunning,
 		listener: l,
 		handler:  handler,
 	}
@@ -55,10 +48,9 @@ func Serve(port int, handler Handler) (*Server, error) {
 }
 
 func (s *Server) Close() error {
-	err := s.listener.Close()
-	s.state = ServerClosed
-	if err != nil {
-		return err
+	s.closed.Store(true)
+	if s.listener != nil {
+		return s.listener.Close()
 	}
 
 	return nil
@@ -69,7 +61,11 @@ func (s *Server) listen() {
 		conn, err := s.listener.Accept()
 
 		if err != nil {
-			log.Fatal(err)
+			if s.closed.Load() {
+				return
+			}
+			log.Printf("Error accepting connection: %v", err)
+			continue
 		}
 
 		go s.handle(conn)
