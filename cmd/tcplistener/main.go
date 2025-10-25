@@ -37,5 +37,8 @@ func main() {
 		fmt.Printf("- %s: %s\n", k, v)
 	}
 
+	fmt.Println("Body:")
+	fmt.Println(string(req.Body))
+
 	fmt.Println("connection has been closed")
 }
