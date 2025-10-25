@@ -3,6 +3,7 @@ package request
 import (
 	"bytes"
 	"fmt"
+	"httpprotocol/internal/headers"
 	"io"
 	"strings"
 )
@@ -14,12 +15,14 @@ const bufferSize = 1024
 type parserState string
 
 const (
-	StateInit parserState = "init"
-	StateDone parserState = "done"
+	StateInit                  parserState = "init"
+	StateDone                  parserState = "done"
+	StateRequestParsingHeaders parserState = "requestStateParsingHeaders"
 )
 
 type Request struct {
 	RequestLine RequestLine
+	Headers     headers.Headers
 	State       parserState
 }
 
@@ -31,7 +34,8 @@ type RequestLine struct {
 
 func newRequest() *Request {
 	return &Request{
-		State: StateInit,
+		State:   StateInit,
+		Headers: headers.NewHeaders(),
 	}
 }
 
@@ -43,20 +47,26 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	req := newRequest()
 
 	for !req.done() {
+		if readToIndex > 0 {
+			readN, err := req.parse(buf[:readToIndex])
+			if err != nil {
+				return nil, err
+			}
+
+			copy(buf, buf[readN:readToIndex])
+			readToIndex -= readN
+
+			if readToIndex > 0 || req.done() {
+				continue
+			}
+		}
+
 		n, err := reader.Read(buf[readToIndex:])
 		if err != nil {
 			return nil, err
 		}
 
 		readToIndex += n
-
-		readN, err := req.parse(buf[:readToIndex])
-		if err != nil {
-			return nil, err
-		}
-
-		copy(buf, buf[readN:readToIndex])
-		readToIndex -= readN
 	}
 
 	return req, nil
@@ -122,29 +132,49 @@ func (r *Request) parse(data []byte) (int, error) {
 		return 0, fmt.Errorf("reading from a done state")
 	}
 
-	if r.State == StateInit {
-		read := 0
-		for {
-			reqLine, noBytes, err := parseRequestLine(data)
+	read := 0
 
-			if err != nil {
-				return 0, err
-			}
+	switch r.State {
+	case StateInit:
+		reqLine, noBytes, err := parseRequestLine(data)
 
-			if noBytes == 0 {
-				return 0, nil
-			}
-
-			r.RequestLine = *reqLine
-			read += noBytes
-
-			r.State = StateDone
-
-			return read, nil
+		if err != nil {
+			return 0, err
 		}
-	}
 
-	return 0, fmt.Errorf("unknown state")
+		if noBytes == 0 {
+			return 0, nil
+		}
+
+		r.RequestLine = *reqLine
+		read += noBytes
+
+		r.State = StateRequestParsingHeaders
+
+		return read, nil
+
+	case StateRequestParsingHeaders:
+		n, done, err := r.Headers.Parse(data[read:])
+
+		if err != nil {
+			return 0, err
+		}
+
+		read += n
+
+		if done {
+			r.State = StateDone
+		}
+
+		return read, nil
+
+	case StateDone:
+		return 0, fmt.Errorf("reading from a done state")
+
+	default:
+		return 0, fmt.Errorf("unknown state")
+
+	}
 }
 
 func (r *Request) done() bool {
