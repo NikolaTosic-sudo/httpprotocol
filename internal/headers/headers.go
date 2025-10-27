@@ -19,6 +19,10 @@ func (h Headers) Get(key string) (string, bool) {
 	return value, found
 }
 
+func (h Headers) Replace(key, value string) {
+	h[key] = value
+}
+
 func isAllowedRune(r rune) bool {
 	switch {
 	case r >= 'a' && r <= 'z':

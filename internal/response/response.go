@@ -15,21 +15,35 @@ const (
 	InternalError StatusCode = 500
 )
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
+type writerState string
+
+const (
+	StatusLine writerState = "statusLine"
+	Headers    writerState = "headers"
+	Body       writerState = "body"
+)
+
+type Writer struct {
+	Writer io.Writer
+	State  writerState
+}
+
+func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
+	var err error
 	switch statusCode {
 	case OK:
-		_, err := w.Write([]byte("HTTP/1.1 200 OK\r\n"))
-		return err
+		_, err = w.Writer.Write([]byte("HTTP/1.1 200 OK\r\n"))
 	case BadRequest:
-		_, err := w.Write([]byte("HTTP/1.1 400 Bad Request\r\n"))
-		return err
+		_, err = w.Writer.Write([]byte("HTTP/1.1 400 Bad Request\r\n"))
 	case InternalError:
-		_, err := w.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n"))
-		return err
+		_, err = w.Writer.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n"))
 	default:
-		_, err := w.Write([]byte("HTTP/1.1 500 \r\n"))
-		return err
+		_, err = w.Writer.Write([]byte("HTTP/1.1 500 \r\n"))
 	}
+
+	w.State = Headers
+
+	return err
 }
 
 func GetDefaultHeaders(contentLen int) headers.Headers {
@@ -42,7 +56,7 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 	return h
 }
 
-func WriteHeaders(w io.Writer, headers headers.Headers) error {
+func (w *Writer) WriteHeaders(headers headers.Headers) error {
 	allHeaders := []byte("")
 
 	for k, v := range headers {
@@ -52,8 +66,13 @@ func WriteHeaders(w io.Writer, headers headers.Headers) error {
 
 	allHeaders = append(allHeaders, []byte("\r\n")...)
 
-	_, err := w.Write(allHeaders)
+	_, err := w.Writer.Write(allHeaders)
 
 	return err
 }
 
+func (w *Writer) WriteBody(p []byte) (int, error) {
+	n, err := w.Writer.Write(p)
+
+	return n, err
+}
