@@ -81,7 +81,6 @@ func (s *Server) handle(conn net.Conn) {
 
 	writer := &response.Writer{
 		Writer: conn,
-		State:  response.StatusLine,
 	}
 
 	s.handler(writer, req)

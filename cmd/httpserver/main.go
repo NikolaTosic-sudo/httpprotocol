@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"httpprotocol/internal/headers"
 	"httpprotocol/internal/request"
 	"httpprotocol/internal/response"
 	"httpprotocol/internal/server"
@@ -13,6 +15,16 @@ import (
 	"strings"
 	"syscall"
 )
+
+func toStr(bytes []byte) string {
+	out := ""
+
+	for _, b := range bytes {
+		out += fmt.Sprintf("%02x", b)
+	}
+
+	return out
+}
 
 const port = 42069
 
@@ -80,9 +92,11 @@ func main() {
 			defaultHeaders.Replace("Content-Length", strLen)
 		}
 
-		if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin/stream") {
+		if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin/") {
 			target := req.RequestLine.RequestTarget
 			res, err := http.Get("https://httpbin.org/" + target[len("/httpbin/"):])
+
+			fmt.Println(target[len("/httpbin/"):], "target")
 
 			if err != nil {
 				body = respond500()
@@ -96,7 +110,12 @@ func main() {
 				defaultHeaders.Set("Transfer-encoding", "chunked")
 				defaultHeaders.Replace("Content-Type", "text/plain")
 
+				defaultHeaders.Set("Trailer", "X-Content-SHA256")
+				defaultHeaders.Set("Trailer", "X-Content-Length")
+
 				w.WriteHeaders(defaultHeaders)
+
+				fullBody := []byte{}
 
 				for {
 					data := make([]byte, 32)
@@ -118,6 +137,8 @@ func main() {
 						fmt.Println(err, "body err")
 					}
 
+					fullBody = append(fullBody, data[:n]...)
+
 					_, err = w.WriteBody([]byte("\r\n"))
 
 					if err != nil {
@@ -125,7 +146,18 @@ func main() {
 					}
 				}
 
-				w.WriteBody([]byte("0\r\n\r\n"))
+				w.WriteBody([]byte("0\r\n"))
+
+				tailers := headers.NewHeaders()
+
+				out := sha256.Sum256(fullBody)
+
+				tailers.Set("X-Content-SHA256", toStr(out[:]))
+				tailers.Set("X-Content-Length", strconv.Itoa(len(fullBody)))
+
+				fmt.Println(tailers, "tailers")
+
+				w.WriteHeaders(tailers)
 
 				return
 			}

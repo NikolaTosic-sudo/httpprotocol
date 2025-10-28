@@ -25,14 +25,9 @@ const (
 
 type Writer struct {
 	Writer io.Writer
-	State  writerState
 }
 
 func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
-
-	if w.State != StatusLine {
-		return fmt.Errorf("correct order is status line, headers, body")
-	}
 
 	var err error
 	switch statusCode {
@@ -45,8 +40,6 @@ func (w *Writer) WriteStatusLine(statusCode StatusCode) error {
 	default:
 		_, err = w.Writer.Write([]byte("HTTP/1.1 500 \r\n"))
 	}
-
-	w.State = Headers
 
 	return err
 }
@@ -62,11 +55,6 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 }
 
 func (w *Writer) WriteHeaders(headers headers.Headers) error {
-
-	if w.State != Headers {
-		return fmt.Errorf("correct order is status line, headers, body")
-	}
-
 	allHeaders := []byte("")
 
 	for k, v := range headers {
@@ -78,19 +66,19 @@ func (w *Writer) WriteHeaders(headers headers.Headers) error {
 
 	_, err := w.Writer.Write(allHeaders)
 
-	w.State = Body
-
 	return err
 }
 
 func (w *Writer) WriteBody(p []byte) (int, error) {
-	if w.State != Body {
-		return 0, fmt.Errorf("correct order is status line, headers, body")
-	}
-
 	n, err := w.Writer.Write(p)
 
-	w.State = StatusLine
-
 	return n, err
+}
+
+func (w *Writer) WriteChunkedBody(p []byte) (int, error) {
+	return 0, nil
+}
+
+func (w *Writer) WriteChunkedBOdyDone() (int, error) {
+	return 0, nil
 }
