@@ -92,11 +92,22 @@ func main() {
 			defaultHeaders.Replace("Content-Length", strLen)
 		}
 
+		if req.RequestLine.RequestTarget == "/video" {
+			f, _ := os.ReadFile("assets/vim.mp4")
+			defaultHeaders.Replace("Content-Type", "video/mp4")
+			defaultHeaders.Replace("Content-Length", fmt.Sprintf("%d", len(f)))
+
+			w.WriteStatusLine(response.OK)
+			w.WriteHeaders(defaultHeaders)
+
+			w.WriteBody(f)
+
+			return
+		}
+
 		if strings.HasPrefix(req.RequestLine.RequestTarget, "/httpbin/") {
 			target := req.RequestLine.RequestTarget
 			res, err := http.Get("https://httpbin.org/" + target[len("/httpbin/"):])
-
-			fmt.Println(target[len("/httpbin/"):], "target")
 
 			if err != nil {
 				body = respond500()
