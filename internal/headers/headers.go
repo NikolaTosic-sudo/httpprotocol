@@ -23,6 +23,14 @@ func (h Headers) Replace(key, value string) {
 	h[key] = value
 }
 
+func (h Headers) Delete(key string) {
+	delete(h, key)
+}
+
+func (h Headers) Set(key, value string) {
+	h[key] = value
+}
+
 func isAllowedRune(r rune) bool {
 	switch {
 	case r >= 'a' && r <= 'z':
